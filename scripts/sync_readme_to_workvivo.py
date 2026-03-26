@@ -125,6 +125,7 @@ def build_payload(readme_text: str, readme_path: Path) -> dict[str, str]:
         "subtitle": subtitle,
         "space_id": os.getenv("WORKVIVO_SPACE_ID", "23244").strip(),
         "html_content": markdown_to_html(readme_text),
+        "is_draft": os.getenv("WORKVIVO_IS_DRAFT", "0").strip(),
     }
 
 
