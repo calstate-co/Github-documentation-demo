@@ -33,6 +33,7 @@ jobs:
         env:
           WORKVIVO: ${{ secrets.WORKVIVO }}
           WORKVIVO_ID: ${{ secrets.WORKVIVO_ID }}
+          WORKVIVO_API_BASE: "https://api.workvivo.us/v1"
           WORKVIVO_PAGE_ID: "76239"
           WORKVIVO_SPACE_ID: "23244"
           WORKVIVO_PAGE_SUBTITLE: "Mirrored from GitHub README"
