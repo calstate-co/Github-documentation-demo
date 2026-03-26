@@ -26,9 +26,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install sync dependencies
-        run: python -m pip install markdown requests
-
       - name: Sync README to Workvivo page
         env:
           WORKVIVO: ${{ secrets.WORKVIVO }}
