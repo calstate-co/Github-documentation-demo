@@ -75,6 +75,29 @@ GitHub includes many features beyond basic code hosting, such as:
 
 GitHub has become one of the most important tools in modern software development because it brings code, collaboration, review, and project management into a single platform. It is widely used in open source and professional development, making it a key skill for anyone working with software.
 
+## Demo: How to Get Onto CSU Cal State University GitHub
+
+This section is a fictional example created for demo purposes.
+
+If CSU Cal State University had its own GitHub access process, a student or staff member might follow steps like these:
+
+1. Go to the CSU developer portal and select **University GitHub Access**.
+2. Sign in with your CSU student or staff email address.
+3. Verify your campus identity using your student ID number and a one-time code sent to your university email.
+4. Accept the CSU coding and collaboration policy to activate your GitHub access.
+5. Choose whether you want access for coursework, research projects, or student organizations.
+6. Click **Join CSU GitHub** to connect your account to the university GitHub system.
+7. Open your CSU GitHub dashboard to view university repositories, class projects, and shared coding resources.
+
+In this demo example, CSU users might also be given:
+
+- Access to class assignment repositories
+- Shared starter code for university projects
+- Private team repositories for research groups
+- GitHub training materials for new students
+
+For a demo explanation, the idea is simple: the university would use GitHub as a place where students, faculty, and staff can sign in, join approved projects, and collaborate on code in an organized way.
+
 ## Final Summary
 
 GitHub is a platform built around Git that helps people store code, manage changes, work together, review updates, and organize software projects. If Git is the tool for tracking code history, GitHub is the place where that work becomes collaborative and visible.
