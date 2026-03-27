@@ -15,27 +15,35 @@ permissions:
 
 jobs:
   publish-gpt-docs:
-    if: ${{ secrets.ORIGIN_REPO_TOKEN != '' }}
     runs-on: ubuntu-latest
+    env:
+      ORIGIN_REPO_TOKEN: ${{ secrets.ORIGIN_REPO_TOKEN }}
 
     steps:
       - name: Check out source repository
         uses: actions/checkout@v6
 
+      - name: Skip when origin token is not configured
+        if: env.ORIGIN_REPO_TOKEN == ''
+        run: echo "ORIGIN_REPO_TOKEN is not configured. Skipping publish."
+
       - name: Check out target repository
+        if: env.ORIGIN_REPO_TOKEN != ''
         uses: actions/checkout@v6
         with:
           repository: mattjhughes/all-about-github
-          token: ${{ secrets.ORIGIN_REPO_TOKEN }}
+          token: ${{ env.ORIGIN_REPO_TOKEN }}
           path: origin-repo
 
       - name: Copy GPT-facing docs
+        if: env.ORIGIN_REPO_TOKEN != ''
         run: |
           mkdir -p origin-repo/gpt-data/github-documentation-demo
           cp README.md origin-repo/gpt-data/github-documentation-demo/README.md
           cp WORKVIVO_SYNC_OVERVIEW.md origin-repo/gpt-data/github-documentation-demo/WORKVIVO_SYNC_OVERVIEW.md
 
       - name: Commit and push if changed
+        if: env.ORIGIN_REPO_TOKEN != ''
         run: |
           cd origin-repo
           git config user.name "github-actions[bot]"
