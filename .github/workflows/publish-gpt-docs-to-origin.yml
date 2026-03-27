@@ -1,0 +1,51 @@
+name: Publish GPT Docs To Origin
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - README.md
+      - WORKVIVO_SYNC_OVERVIEW.md
+      - .github/workflows/publish-gpt-docs-to-origin.yml
+
+permissions:
+  contents: read
+
+jobs:
+  publish-gpt-docs:
+    if: ${{ secrets.ORIGIN_REPO_TOKEN != '' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source repository
+        uses: actions/checkout@v6
+
+      - name: Check out target repository
+        uses: actions/checkout@v6
+        with:
+          repository: mattjhughes/all-about-github
+          token: ${{ secrets.ORIGIN_REPO_TOKEN }}
+          path: origin-repo
+
+      - name: Copy GPT-facing docs
+        run: |
+          mkdir -p origin-repo/gpt-data/github-documentation-demo
+          cp README.md origin-repo/gpt-data/github-documentation-demo/README.md
+          cp WORKVIVO_SYNC_OVERVIEW.md origin-repo/gpt-data/github-documentation-demo/WORKVIVO_SYNC_OVERVIEW.md
+
+      - name: Commit and push if changed
+        run: |
+          cd origin-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- gpt-data/github-documentation-demo; then
+            echo "No GPT docs changes to publish."
+            exit 0
+          fi
+
+          git add gpt-data/github-documentation-demo
+          git commit -m "Sync GPT docs from calstate-co/Github-documentation-demo"
+          git push origin HEAD:main
