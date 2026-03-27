@@ -28,10 +28,11 @@ jobs:
 
       - name: Sync README to Workvivo page
         env:
-          WORKVIVO: ${{ secrets.WORKVIVO }}
+          WORKVIVO_API_KEY: ${{ secrets.WORKVIVO_API_KEY }}
           WORKVIVO_ID: ${{ secrets.WORKVIVO_ID }}
           WORKVIVO_API_BASE: "https://api.workvivo.us/v1"
-          WORKVIVO_PAGE_ID: "76239"
+          WORKVIVO_PAGE_ID: "76248"
           WORKVIVO_SPACE_ID: "23244"
           WORKVIVO_PAGE_SUBTITLE: "Mirrored from GitHub README"
+          WORKVIVO_IS_DRAFT: "0"
         run: python scripts/sync_readme_to_workvivo.py

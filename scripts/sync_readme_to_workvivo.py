@@ -14,11 +14,50 @@ import urllib.request
 from pathlib import Path
 
 
+def load_dotenv(*candidates: Path) -> None:
+    for candidate in candidates:
+        if not candidate.exists() or not candidate.is_file():
+            continue
+        for raw_line in candidate.read_text(encoding="utf-8").splitlines():
+            line = raw_line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, value = line.split("=", 1)
+            key = key.strip()
+            if not key or key in os.environ:
+                continue
+            value = value.strip()
+            if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+                value = value[1:-1]
+            os.environ[key] = value
+
+
 def require_env(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value:
         raise RuntimeError(f"Missing required environment variable: {name}")
     return value
+
+
+def first_env(*names: str) -> str:
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    joined = ", ".join(names)
+    raise RuntimeError(f"Missing required environment variable. Tried: {joined}")
+
+
+def resolve_api_base() -> str:
+    explicit_base = os.getenv("WORKVIVO_API_BASE", "").strip()
+    if explicit_base:
+        return explicit_base
+
+    api_url = os.getenv("WORKVIVO_API_URL", "").strip()
+    if api_url:
+        return f"{api_url.rstrip('/')}/v1"
+
+    return "https://api.workvivo.com/v1"
 
 
 def extract_title(markdown_text: str, readme_path: Path) -> str:
@@ -111,7 +150,8 @@ def markdown_to_html(markdown_text: str) -> str:
 
     flush_paragraph()
     flush_list()
-    return "\n".join(blocks)
+    inner_html = "\n".join(blocks)
+    return f'<div class="activity-text">\n{inner_html}\n</div>'
 
 
 def build_payload(readme_text: str, readme_path: Path) -> dict[str, str]:
@@ -120,13 +160,58 @@ def build_payload(readme_text: str, readme_path: Path) -> dict[str, str]:
     )
     subtitle = os.getenv("WORKVIVO_PAGE_SUBTITLE", "").strip() or "Mirrored from README.md"
 
-    return {
+    payload = {
         "title": title,
         "subtitle": subtitle,
         "space_id": os.getenv("WORKVIVO_SPACE_ID", "23244").strip(),
         "html_content": markdown_to_html(readme_text),
         "is_draft": os.getenv("WORKVIVO_IS_DRAFT", "0").strip(),
     }
+    external_id = os.getenv("WORKVIVO_PAGE_EXTERNAL_ID", "").strip()
+    if external_id:
+        payload["external_id"] = external_id
+    parent_id = os.getenv("WORKVIVO_PARENT_ID", "").strip()
+    if parent_id:
+        payload["parent_id"] = parent_id
+    external_parent_id = os.getenv("WORKVIVO_EXTERNAL_PARENT_ID", "").strip()
+    if external_parent_id:
+        payload["external_parent_id"] = external_parent_id
+    return payload
+
+
+def request_json(
+    method: str,
+    url: str,
+    token: str,
+    organisation_id: str,
+    payload: dict[str, str] | None = None,
+) -> dict[str, object]:
+    encoded_payload = None
+    headers = {
+        "Accept": "application/json",
+        "Authorization": f"Bearer {token}",
+        "Workvivo-Id": organisation_id,
+    }
+    if payload is not None:
+        encoded_payload = urllib.parse.urlencode(payload).encode("utf-8")
+        headers["Content-Type"] = "application/x-www-form-urlencoded"
+
+    request = urllib.request.Request(
+        url,
+        data=encoded_payload,
+        method=method,
+        headers=headers,
+    )
+
+    try:
+        with urllib.request.urlopen(request, timeout=60) as response:
+            response_body = response.read().decode("utf-8")
+            return json.loads(response_body)
+    except urllib.error.HTTPError as exc:
+        error_body = exc.read().decode("utf-8", "replace")
+        raise RuntimeError(
+            f"Workvivo request failed with status {exc.code}: {error_body}"
+        ) from exc
 
 
 def update_page(
@@ -135,31 +220,45 @@ def update_page(
     token: str,
     organisation_id: str,
     payload: dict[str, str],
-) -> None:
-    encoded_payload = urllib.parse.urlencode(payload).encode("utf-8")
-    request = urllib.request.Request(
+) -> dict[str, object]:
+    return request_json(
+        "PUT",
         f"{api_base.rstrip('/')}/pages/{page_id}",
-        data=encoded_payload,
-        method="PUT",
-        headers={
-            "Accept": "application/json",
-            "Authorization": f"Bearer {token}",
-            "Workvivo-Id": organisation_id,
-            "Content-Type": "application/x-www-form-urlencoded",
-        },
+        token,
+        organisation_id,
+        payload,
     )
 
-    try:
-        with urllib.request.urlopen(request, timeout=60) as response:
-            response_body = response.read().decode("utf-8")
-            body = json.loads(response_body)
-    except urllib.error.HTTPError as exc:
-        error_body = exc.read().decode("utf-8", "replace")
-        raise RuntimeError(
-            f"Workvivo request failed with status {exc.code}: {error_body}"
-        ) from exc
 
-    print(json.dumps(body, indent=2))
+def upsert_page(
+    api_base: str,
+    page_id: str,
+    token: str,
+    organisation_id: str,
+    payload: dict[str, str],
+) -> dict[str, object]:
+    external_id = payload.get("external_id", "").strip()
+    if external_id:
+        try:
+            return request_json(
+                "PUT",
+                f"{api_base.rstrip('/')}/pages/by-external-id/{urllib.parse.quote(external_id, safe='')}",
+                token,
+                organisation_id,
+                payload,
+            )
+        except RuntimeError as exc:
+            message = str(exc)
+            if "status 404" not in message:
+                raise
+            return request_json(
+                "POST",
+                f"{api_base.rstrip('/')}/pages",
+                token,
+                organisation_id,
+                payload,
+            )
+    return update_page(api_base, page_id, token, organisation_id, payload)
 
 
 def parse_args() -> argparse.Namespace:
@@ -182,6 +281,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> int:
     args = parse_args()
     readme_path = Path(args.readme)
+    load_dotenv(Path(".env"), Path("..") / ".env", readme_path.parent / ".env")
 
     if not readme_path.exists():
         raise RuntimeError(f"Markdown source not found: {readme_path}")
@@ -197,12 +297,13 @@ def main() -> int:
         print(json.dumps(preview, indent=2))
         return 0
 
-    token = require_env("WORKVIVO")
+    token = first_env("WORKVIVO", "WORKVIVO_API_KEY")
     organisation_id = require_env("WORKVIVO_ID")
     page_id = os.getenv("WORKVIVO_PAGE_ID", "76239").strip()
-    api_base = os.getenv("WORKVIVO_API_BASE", "https://api.workvivo.com/v1").strip()
+    api_base = resolve_api_base()
 
-    update_page(api_base, page_id, token, organisation_id, payload)
+    body = upsert_page(api_base, page_id, token, organisation_id, payload)
+    print(json.dumps(body, indent=2))
     return 0
 
 
